@@ -108,7 +108,49 @@ struct MenuContent: View {
 
         Button("Permissions…") { PermissionsWindowController.shared.show() }
         Button("Bluetooth Settings…") { coordinator.openBluetoothSettings() }
-        Button("Quit") { NSApp.terminate(nil) }
+
+        Divider()
+
+        Button("About PairMagic") { AboutPanel.show() }
+        Button("Quit PairMagic") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
+    }
+}
+
+/// The standard macOS About panel (icon, name, version, copyright), with credits
+/// describing the app and linking to its source.
+enum AboutPanel {
+    static let repositoryURL = URL(string: "https://github.com/kristenadd/PairMagic")!
+
+    static func show() {
+        // Menu bar apps aren't active by default, so bring the panel forward explicitly.
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
+    }
+
+    private static var credits: NSAttributedString {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        paragraph.paragraphSpacing = 6
+        let body: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+            .foregroundColor: NSColor.secondaryLabelColor,
+            .paragraphStyle: paragraph,
+        ]
+
+        let text = NSMutableAttributedString()
+        text.append(NSAttributedString(string: "Make every accessory magic.\n", attributes: [
+            .font: NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .semibold),
+            .foregroundColor: NSColor.labelColor,
+            .paragraphStyle: paragraph,
+        ]))
+        text.append(NSAttributedString(string: """
+            PairMagic watches for Bluetooth keyboards, mice, game controllers and headsets in \
+            pairing mode and pairs them with one click. Everything happens on your Mac.\n
+            """, attributes: body))
+        var link = body
+        link[.link] = repositoryURL
+        text.append(NSAttributedString(string: "github.com/kristenadd/PairMagic", attributes: link))
+        return text
     }
 }
