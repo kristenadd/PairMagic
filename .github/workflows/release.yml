@@ -131,10 +131,9 @@ jobs:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
           [ -n "$SPARKLE_PRIVATE_KEY" ] || { echo "::error::The SPARKLE_PRIVATE_KEY secret isn't set"; exit 1; }
-          # GitHub's generated notes (changes since the previous release), as Markdown for the release
-          # page and as HTML for Sparkle's update window.
-          gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
-            -f tag_name="v$VERSION" -f target_commitish="$GITHUB_SHA" --jq .body > build/release/notes.md
+          # The commits since the previous release, as Markdown for the release page and as HTML
+          # for Sparkle's update window.
+          scripts/release-notes.sh "$VERSION" "$GITHUB_SHA" > build/release/notes.md
           gh api markdown -f text="$(cat build/release/notes.md)" -f mode=gfm -f context="$GITHUB_REPOSITORY" \
             > build/release/notes.html
           scripts/make-appcast.sh "build/release/PairMagic-$VERSION.dmg" "$VERSION" "$BUILD_NUMBER" build/release/notes.html

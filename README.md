@@ -72,7 +72,9 @@ Actions each time you push to `main`. Pushes that only change docs or `Design/` 
 publishes a GitHub release tagged `vX.Y.Z`, with the notarized DMG, its SHA-256 checksum and the
 Sparkle update feed (`appcast.xml`) attached. Installed copies read the feed from the newest
 release (`…/releases/latest/download/appcast.xml`), so publishing a release is all it takes to
-offer the update. The feed includes GitHub's generated release notes.
+offer the update. The release notes, on GitHub and in the update window, list the commit messages
+since the previous release (from [`scripts/release-notes.sh`](scripts/release-notes.sh)), so write
+them for users.
 
 - **Version:** each release bumps the patch number of the newest `vX.Y.Z` tag, so 1.0.1, then 1.0.2,
   and so on. Write `#minor` or `#major` in a commit message to bump that part instead. To jump to a
