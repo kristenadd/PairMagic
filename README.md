@@ -14,6 +14,8 @@ Bluetooth devices in pairing mode and pops up a one-click **Pair** prompt.
   is removed first. With *Replace Paired Devices with the Same Name (Experimental)* on (off by default), a paired device
   with the same name, such as your old controller of the same model, is removed too.
 - Handles keyboard passkeys: if a keyboard needs a code, the popup shows it big enough to type.
+- Updates itself: it checks for new releases daily with [Sparkle](https://sparkle-project.org) and
+  offers to install them. You can also choose **Check for Updates…** from the menu.
 
 ## Build & run
 
@@ -67,7 +69,10 @@ The result only opens on your own Mac.
 
 [`.github/workflows/release.yml`](.github/workflows/release.yml) runs the same script on GitHub
 Actions each time you push to `main`. Pushes that only change docs or `Design/` are skipped. It
-publishes a GitHub release tagged `vX.Y.Z`, with the notarized DMG and its SHA-256 checksum attached.
+publishes a GitHub release tagged `vX.Y.Z`, with the notarized DMG, its SHA-256 checksum and the
+Sparkle update feed (`appcast.xml`) attached. Installed copies read the feed from the newest
+release (`…/releases/latest/download/appcast.xml`), so publishing a release is all it takes to
+offer the update. The feed includes GitHub's generated release notes.
 
 - **Version:** each release bumps the patch number of the newest `vX.Y.Z` tag, so 1.0.1, then 1.0.2,
   and so on. Write `#minor` or `#major` in a commit message to bump that part instead. To jump to a
@@ -85,10 +90,20 @@ One-time setup: add these under the repo's Settings › Secrets and variables �
 | `DEVELOPER_ID_P12_PASSWORD` | The password you gave the .p12. |
 | `NOTARY_APPLE_ID` | Your Apple ID email. |
 | `NOTARY_APP_PASSWORD` | An app-specific password from [account.apple.com](https://account.apple.com). Use a new one just for CI, so you can revoke it on its own. |
+| `SPARKLE_PRIVATE_KEY` | The private EdDSA key that signs updates. Export it with `build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys -x <file>` (after a build has fetched Sparkle), copy it with `pbcopy < <file>`, then delete the file. |
 
 Instead of the Apple ID secrets, you can use an App Store Connect API key (Users and Access ›
 Integrations › Team Keys, Developer role). Set `NOTARY_API_KEY_P8` to the contents of the .p8 file,
 `NOTARY_API_KEY_ID` to its key ID and `NOTARY_API_ISSUER_ID` to the issuer ID.
+
+### Update signing
+
+Sparkle only installs an update whose feed and DMG are signed with the private key matching
+`SUPublicEDKey` in [`PairMagic/Info.plist`](PairMagic/Info.plist), and whose app is signed by the same
+Developer ID team. The private key lives in your login keychain (made by Sparkle's `generate_keys`)
+and in the `SPARKLE_PRIVATE_KEY` secret. Keep a backup: if it's lost, installed copies can't verify
+new updates and users have to download the next version by hand. To make a feed locally, run
+`scripts/make-appcast.sh <dmg> <version> <build>` after `scripts/release.sh`.
 
 macOS runners use more of the Actions allowance than Linux ones: each minute counts as 10 on a
 private repo. They're free on a public repo.

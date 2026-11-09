@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Sparkle updates. Most keys come from INFOPLIST_KEY_* build settings; these are custom. -->
+	<!-- The newest release's appcast.xml, published by .github/workflows/release.yml. -->
+	<key>SUFeedURL</key>
+	<string>https://github.com/kristenadd/PairMagic/releases/latest/download/appcast.xml</string>
+	<!-- Public half of the EdDSA key in the release workflow's SPARKLE_PRIVATE_KEY secret. -->
+	<key>SUPublicEDKey</key>
+	<string>5KGNn8DHJVukrbd8VjU5DooFDhmzdL9dysHpt0MClko=</string>
+	<!-- Only accept a feed signed with that key, and check the download before unpacking it. -->
+	<key>SURequireSignedFeed</key>
+	<true/>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
+	<!-- Check daily without first asking permission (the menu has a toggle to turn it off). -->
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
+</dict>
+</plist>

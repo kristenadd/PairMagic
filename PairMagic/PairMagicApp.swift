@@ -5,6 +5,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #if DEBUG
         if CommandLine.arguments.contains("--dump-bluetooth-settings") { SettingsAutomator.dumpBluetoothPane() }
         #endif
+        _ = Updater.shared // starts Sparkle's scheduled update checks
         // Wait a moment so a first-run Bluetooth prompt has appeared and the
         // authorization state has settled before deciding.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
@@ -22,7 +23,7 @@ struct PairMagicApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuContent(coordinator: coordinator)
+            MenuContent(coordinator: coordinator, updater: .shared)
         } label: {
             Image(systemName: "dot.radiowaves.left.and.right")
         }
@@ -32,6 +33,7 @@ struct PairMagicApp: App {
 
 struct MenuContent: View {
     @ObservedObject var coordinator: PairingCoordinator
+    @ObservedObject var updater: Updater
 
     var body: some View {
         if !coordinator.bluetoothPoweredOn {
@@ -111,6 +113,9 @@ struct MenuContent: View {
 
         Divider()
 
+        Button("Check for Updates…") { updater.checkForUpdates() }
+            .disabled(!updater.canCheckForUpdates)
+        Toggle("Automatically Check for Updates", isOn: $updater.automaticallyChecks)
         Button("About PairMagic") { AboutPanel.show() }
         Button("Quit PairMagic") { NSApp.terminate(nil) }
             .keyboardShortcut("q")

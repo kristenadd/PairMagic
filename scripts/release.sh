@@ -67,12 +67,26 @@ mkdir -p "$OUT"
 step "Archiving"
 xcodebuild archive -quiet \
     -project "$APP_NAME.xcodeproj" -scheme "$APP_NAME" -configuration Release \
-    -archivePath "$ARCHIVE" \
+    -archivePath "$ARCHIVE" -clonedSourcePackagesDirPath build/SourcePackages \
     CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" OTHER_CODE_SIGN_FLAGS="--timestamp" \
     ${VERSION_SETTINGS[@]+"${VERSION_SETTINGS[@]}"}
 
 APP="$OUT/$APP_NAME.app"
 ditto "$ARCHIVE/Products/Applications/$APP_NAME.app" "$APP"
+
+# Xcode signs Sparkle.framework when embedding it, but not the helper programs inside it, which keep
+# Sparkle's own signature. Notarization needs everything signed with our Developer ID and the
+# hardened runtime, innermost first, then the app again so its seal covers the new signatures.
+SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"
+if [ -d "$SPARKLE" ]; then
+    step "Signing Sparkle"
+    sign() { codesign --force --sign "$SIGNING_IDENTITY" --options runtime --timestamp "$@"; }
+    for helper in "$SPARKLE"/Versions/B/XPCServices/*.xpc "$SPARKLE/Versions/B/Autoupdate" "$SPARKLE/Versions/B/Updater.app"; do
+        [ -e "$helper" ] && sign --preserve-metadata=entitlements "$helper"
+    done
+    sign "$SPARKLE"
+    sign --preserve-metadata=entitlements,requirements,flags "$APP"
+fi
 
 step "Verifying the signature"
 codesign --verify --deep --strict --verbose=2 "$APP"
@@ -81,6 +95,15 @@ signature=$(codesign -d --verbose=2 "$APP" 2>&1)
 [[ "$signature" == *"(runtime)"* ]] || fail "Hardened runtime isn't enabled"
 entitlements=$(codesign -d --entitlements - --xml "$APP" 2>/dev/null)
 [[ "$entitlements" != *"get-task-allow"* ]] || fail "Release build has the debugging entitlement"
+[[ "$entitlements" == *"com.apple.security.device.bluetooth"* ]] || fail "Release build lost the Bluetooth entitlement"
+# Every nested program must carry our team's signature, or notarization rejects the app.
+team=$(sed -n 's/^TeamIdentifier=//p' <<<"$signature")
+while IFS= read -r code; do
+    nested=$(codesign -d --verbose=2 "$code" 2>&1)
+    [[ "$nested" == *"TeamIdentifier=$team"* && "$nested" == *"(runtime)"* ]] \
+        || fail "${code#"$APP/"} isn't signed with team $team and the hardened runtime"
+done < <(find "$APP/Contents/Frameworks" \
+    \( -type d \( -name '*.framework' -o -name '*.app' -o -name '*.xpc' \) \) -o \( -type f -name Autoupdate \) 2>/dev/null)
 
 # MARK: Notarize the app
 
