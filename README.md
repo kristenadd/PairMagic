@@ -63,6 +63,36 @@ DMG. The result is `build/release/PairMagic-<version>.dmg`. To test the script w
 certificate, run `SIGNING_IDENTITY="Apple Development" SKIP_NOTARIZATION=1 scripts/release.sh`.
 The result only opens on your own Mac.
 
+### Automatic releases
+
+[`.github/workflows/release.yml`](.github/workflows/release.yml) runs the same script on GitHub
+Actions each time you push to `main`. Pushes that only change docs or `Design/` are skipped. It
+publishes a GitHub release tagged `vX.Y.Z`, with the notarized DMG and its SHA-256 checksum attached.
+
+- **Version:** each release bumps the patch number of the newest `vX.Y.Z` tag, so 1.0.1, then 1.0.2,
+  and so on. Write `#minor` or `#major` in a commit message to bump that part instead. To jump to a
+  specific version, raise `MARKETING_VERSION` in the project. The build number is the workflow's
+  run number. The version is set at build time and never committed back, so the tags are the
+  record of what was released.
+- **Skipping:** write `[skip release]` in a commit message to push without releasing.
+- **Manual release:** Actions › Release › Run workflow, then pick patch, minor or major.
+
+One-time setup: add these under the repo's Settings › Secrets and variables › Actions.
+
+| Secret | Value |
+| --- | --- |
+| `DEVELOPER_ID_P12_BASE64` | Your Developer ID certificate and its private key. In Keychain Access, right-click **Developer ID Application: …** › Export, save it as a .p12 with a password, then run `base64 -i <file>.p12 \| pbcopy` and paste the result. Delete the .p12 afterwards. |
+| `DEVELOPER_ID_P12_PASSWORD` | The password you gave the .p12. |
+| `NOTARY_APPLE_ID` | Your Apple ID email. |
+| `NOTARY_APP_PASSWORD` | An app-specific password from [account.apple.com](https://account.apple.com). Use a new one just for CI, so you can revoke it on its own. |
+
+Instead of the Apple ID secrets, you can use an App Store Connect API key (Users and Access ›
+Integrations › Team Keys, Developer role). Set `NOTARY_API_KEY_P8` to the contents of the .p8 file,
+`NOTARY_API_KEY_ID` to its key ID and `NOTARY_API_ISSUER_ID` to the issuer ID.
+
+macOS runners use more of the Actions allowance than Linux ones: each minute counts as 10 on a
+private repo. They're free on a public repo.
+
 ## Icon
 
 The icon is drawn in code by [`Design/RenderIcon.swift`](Design/RenderIcon.swift). To regenerate a
