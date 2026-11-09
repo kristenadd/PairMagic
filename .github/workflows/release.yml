@@ -37,7 +37,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # all tags and history, to work out the version
 
@@ -84,9 +84,13 @@ jobs:
           security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$P12_PASSWORD" -f pkcs12 \
             -T /usr/bin/codesign -T /usr/bin/security
           rm -P "$RUNNER_TEMP/cert.p12"
-          # Apple's Developer ID intermediate, so codesign can build the full chain.
+          # Apple's Developer ID intermediate, so codesign can build the full chain. A .p12 exported
+          # from Keychain Access usually includes it already, which makes this import report a duplicate.
           curl -fsSL https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer -o "$RUNNER_TEMP/DeveloperIDG2CA.cer"
-          security import "$RUNNER_TEMP/DeveloperIDG2CA.cer" -k "$keychain"
+          if ! output=$(security import "$RUNNER_TEMP/DeveloperIDG2CA.cer" -k "$keychain" 2>&1); then
+            [[ "$output" == *"already exists"* ]] || { echo "$output"; exit 1; }
+            echo "Developer ID intermediate certificate already included in the .p12"
+          fi
 
           # Let codesign use the key without a prompt, and put the keychain in the search list.
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" >/dev/null
