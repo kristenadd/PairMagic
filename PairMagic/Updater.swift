@@ -21,19 +21,34 @@ final class Updater: NSObject, ObservableObject, SPUStandardUserDriverDelegate {
     private var controller: SPUStandardUpdaterController!
     private var updater: SPUUpdater { controller.updater }
     private var observers: Set<AnyCancellable> = []
+    private var started = false
 
     private override init() {
         super.init()
+        // Debug builds don't check on their own: they'd always find the latest release
+        // newer than themselves. (Not via automaticallyChecksForUpdates, which is stored
+        // in preferences shared with the installed app.)
+        #if DEBUG
+        let start = false
+        #else
+        let start = true
+        #endif
         controller = SPUStandardUpdaterController(
-            startingUpdater: true, updaterDelegate: nil, userDriverDelegate: self)
+            startingUpdater: start, updaterDelegate: nil, userDriverDelegate: self)
+        started = start
         automaticallyChecks = updater.automaticallyChecksForUpdates
         updater.publisher(for: \.canCheckForUpdates)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] in self?.canCheckForUpdates = $0 }
+            .sink { [weak self] canCheck in
+                guard let self else { return }
+                // An updater that hasn't started yet reports false, but checking starts it.
+                self.canCheckForUpdates = canCheck || !self.started
+            }
             .store(in: &observers)
     }
 
     func checkForUpdates() {
+        if !started { controller.startUpdater(); started = true }
         NSApp.activate(ignoringOtherApps: true)
         controller.checkForUpdates(nil)
     }

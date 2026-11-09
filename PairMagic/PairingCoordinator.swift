@@ -67,6 +67,11 @@ final class PairingCoordinator: ObservableObject {
     @Published var autoPopup: Bool {
         didSet { defaults.set(autoPopup, forKey: Keys.autoPopup) }
     }
+    /// Only pop up for devices with a strong signal, i.e. right next to the Mac.
+    /// Others are still listed in the menu.
+    @Published var nearbyOnly: Bool {
+        didSet { defaults.set(nearbyOnly, forKey: Keys.nearbyOnly); offerWaitingDevices() }
+    }
     @Published var showAllTypes: Bool {
         didSet { defaults.set(showAllTypes, forKey: Keys.showAll); typeFilterChanged() }
     }
@@ -100,6 +105,7 @@ final class PairingCoordinator: ObservableObject {
     private enum Keys {
         static let scanning = "scanning", autoPopup = "autoPopup", showAll = "showAllTypes", replace = "replaceSameName"
         static let ignored = "ignoredDevices", autoConfirm = "autoConfirmPrompt", categories = "deviceCategories"
+        static let nearbyOnly = "nearbyOnly"
     }
 
     /// How long a device can go unseen before it's considered out of pairing mode
@@ -137,10 +143,11 @@ final class PairingCoordinator: ObservableObject {
 
     private init() {
         defaults.register(defaults: [Keys.scanning: true, Keys.autoPopup: true, Keys.showAll: false, Keys.replace: false,
-                                     Keys.autoConfirm: true])
+                                     Keys.autoConfirm: true, Keys.nearbyOnly: true])
         autoConfirmPrompt = defaults.bool(forKey: Keys.autoConfirm)
         isScanning = defaults.bool(forKey: Keys.scanning)
         autoPopup = defaults.bool(forKey: Keys.autoPopup)
+        nearbyOnly = defaults.bool(forKey: Keys.nearbyOnly)
         showAllTypes = defaults.bool(forKey: Keys.showAll)
         enabledCategories = (defaults.stringArray(forKey: Keys.categories)?.compactMap(DeviceCategory.init(rawValue:)))
             .map(Set.init) ?? Set(DeviceCategory.choices)
@@ -211,6 +218,8 @@ final class PairingCoordinator: ObservableObject {
                 known.lastSeen = Date()
                 known.rssi = rssi
                 devices[id] = known
+                // It may have been too far away to pop up when first verified.
+                offerIfWanted(known)
             }
             // The name often arrives in a later packet (the scan response). It's
             // needed to spot same-named pairings to replace, so pick it up.
@@ -243,12 +252,26 @@ final class PairingCoordinator: ObservableObject {
             ignored[index].name = name
         }
         publishNearby()
-        guard isNew else { return }
-        if case .lowEnergy = device.source, !verified.contains(device.id) {
+        if isNew, case .lowEnergy = device.source, !verified.contains(device.id) {
             verify(device)
-        } else if wantsPopup(device) {
+        } else {
+            // New, or seen again by a later inquiry, possibly closer than before.
+            offerIfWanted(device)
+        }
+    }
+
+    /// Pops up a device that wants one but has no popup yet, e.g. one that just
+    /// came close enough. Devices that were dismissed or ignored stay quiet.
+    private func offerIfWanted(_ device: NearbyDevice) {
+        if sessions[device.id] == nil, wantsPopup(device) {
             showPopup(for: device, playSound: true)
         }
+    }
+
+    /// Re-checks every device after a setting change, e.g. turning off "Only Pop
+    /// Up for Nearby Devices" offers the farther ones that were held back.
+    private func offerWaitingDevices() {
+        for device in devices.values { offerIfWanted(device) }
     }
 
     private func shouldOffer(_ device: NearbyDevice) -> Bool {
@@ -279,6 +302,7 @@ final class PairingCoordinator: ObservableObject {
 
     private func wantsPopup(_ device: NearbyDevice) -> Bool {
         autoPopup && shouldOffer(device) && !dismissed.contains(device.id) && !isIgnored(device.id)
+            && (!nearbyOnly || device.isNearby)
     }
 
     /// Test-connects to an LE device and only offers it if it accepts (see
@@ -339,7 +363,7 @@ final class PairingCoordinator: ObservableObject {
         }
         let session = PairingSession(device: device)
         session.replacing = replacementSummary(for: device)
-        Self.log.notice("Offering \(device.displayName, privacy: .public) (advertised name \(device.name ?? "none", privacy: .public)): \(session.replacing ?? "nothing to replace", privacy: .public)")
+        Self.log.notice("Offering \(device.displayName, privacy: .public) (advertised name \(device.name ?? "none", privacy: .public), RSSI \(device.rssi.map(String.init) ?? "unknown", privacy: .public)): \(session.replacing ?? "nothing to replace", privacy: .public)")
         sessions[device.id] = session
         popups.show(session, coordinator: self)
         if playSound { NSSound(named: "Pop")?.play() }

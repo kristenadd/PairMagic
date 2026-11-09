@@ -98,10 +98,28 @@ struct NearbyDevice {
         return nil
     }
 
-    var signalDescription: String? {
+    /// Signal strength (dBm) from which a device counts as right next to the Mac,
+    /// roughly within a metre or two.
+    static let strongSignal = -60
+
+    /// The RSSI, if the radio reported a real reading (127 means "not available").
+    private var validRSSI: Int? {
         guard let rssi, rssi < 0, rssi > -127 else { return nil }
+        return rssi
+    }
+
+    /// True when the signal is strong, so the device is probably the one in the
+    /// user's hand rather than a neighbour's. Unknown strength counts as nearby,
+    /// so a device that doesn't report RSSI can still pop up.
+    var isNearby: Bool {
+        guard let rssi = validRSSI else { return true }
+        return rssi >= Self.strongSignal
+    }
+
+    var signalDescription: String? {
+        guard let rssi = validRSSI else { return nil }
         switch rssi {
-        case (-60)...: return "Strong signal"
+        case Self.strongSignal...: return "Strong signal"
         case (-75)...: return "Good signal"
         default: return "Weak signal"
         }

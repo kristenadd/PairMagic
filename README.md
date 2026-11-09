@@ -10,6 +10,9 @@ Bluetooth devices in pairing mode and pops up a one-click **Pair** prompt.
 
 - Detects keyboards, mice, game controllers, headsets and speakers, and shows a matching icon.
 - Shows a description built from the device's Bluetooth class, transport and signal strength.
+- Only pops up for devices right next to the Mac (a strong signal, −60 dBm or better), so a
+  neighbour's headphones don't interrupt you. Farther devices are still listed in the menu, and
+  *Only Pop Up for Nearby Devices* turns this off.
 - **Replaces old pairings**: if the same device (same address) is already paired, the stale pairing
   is removed first. With *Replace Paired Devices with the Same Name (Experimental)* on (off by default), a paired device
   with the same name, such as your old controller of the same model, is removed too.

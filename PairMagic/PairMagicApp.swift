@@ -82,6 +82,8 @@ struct MenuContent: View {
 
         Toggle("Scan for Devices", isOn: $coordinator.isScanning)
         Toggle("Pop Up When a Device Appears", isOn: $coordinator.autoPopup)
+        Toggle("Only Pop Up for Nearby Devices", isOn: $coordinator.nearbyOnly)
+            .disabled(!coordinator.autoPopup)
         Toggle("Replace Paired Devices with the Same Name (Experimental)", isOn: Binding(
             get: { coordinator.replaceSameName },
             set: { coordinator.setReplaceSameName($0) }
