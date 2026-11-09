@@ -80,8 +80,12 @@ struct NearbyDevice {
     var rssi: Int?
     var lastSeen: Date
 
+    /// False until the device has told us its name (LE names often arrive in a
+    /// later packet, and some devices never send one).
+    var hasName: Bool { !(name ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
+
     var displayName: String {
-        if let name, !name.isEmpty { return name }
+        if hasName, let name { return name }
         if let address { return "Unnamed \(kind.label) (\(address))" }
         return "Unnamed \(kind.label)"
     }

@@ -13,6 +13,8 @@ Bluetooth devices in pairing mode and pops up a one-click **Pair** prompt.
 - Only pops up for devices right next to the Mac (a strong signal, −60 dBm or better), so a
   neighbour's headphones don't interrupt you. Farther devices are still listed in the menu, and
   *Only Pop Up for Nearby Devices* turns this off.
+- Doesn't pop up for devices that don't send a name (they show as "Unnamed …" in the menu, where
+  you can still pick them).
 - **Replaces old pairings**: if the same device (same address) is already paired, the stale pairing
   is removed first. With *Replace Paired Devices with the Same Name (Experimental)* on (off by default), a paired device
   with the same name, such as your old controller of the same model, is removed too.

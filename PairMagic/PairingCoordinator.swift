@@ -300,8 +300,10 @@ final class PairingCoordinator: ObservableObject {
         publishNearby()
     }
 
+    /// Unnamed devices are usually other people's phones, beacons and the like, so they
+    /// don't pop up. They're still listed in the menu, and pop up once their name arrives.
     private func wantsPopup(_ device: NearbyDevice) -> Bool {
-        autoPopup && shouldOffer(device) && !dismissed.contains(device.id) && !isIgnored(device.id)
+        autoPopup && device.hasName && shouldOffer(device) && !dismissed.contains(device.id) && !isIgnored(device.id)
             && (!nearbyOnly || device.isNearby)
     }
 
