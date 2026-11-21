@@ -64,7 +64,10 @@ final class PopupManager {
     }
 
     private func layout() {
-        guard let screen = NSScreen.main else { return }
+        // `NSScreen.main` follows whichever display has the key window, so popups
+        // would jump between monitors. The first screen is always the primary
+        // display (the one with the menu bar).
+        guard let screen = NSScreen.screens.first else { return }
         let visible = screen.visibleFrame
         var top = visible.maxY - 10
         for (_, panel) in panels {

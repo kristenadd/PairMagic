@@ -184,7 +184,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PairMagic/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "PairMagic";
+				INFOPLIST_KEY_CFBundleDisplayName = "PairMagic Debug";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "PairMagic watches for nearby Bluetooth devices in pairing mode so you can pair them with one click.";
@@ -194,8 +194,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.kristenadd.PairMagic;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.kristenadd.PairMagic.debug;
+				PRODUCT_MODULE_NAME = PairMagic;
+				PRODUCT_NAME = "PairMagic Debug";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 			};

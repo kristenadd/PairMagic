@@ -26,8 +26,8 @@ final class Updater: NSObject, ObservableObject, SPUStandardUserDriverDelegate {
     private override init() {
         super.init()
         // Debug builds don't check on their own: they'd always find the latest release
-        // newer than themselves. (Not via automaticallyChecksForUpdates, which is stored
-        // in preferences shared with the installed app.)
+        // newer than themselves, and installing it would replace the debug build with
+        // the release one.
         #if DEBUG
         let start = false
         #else
