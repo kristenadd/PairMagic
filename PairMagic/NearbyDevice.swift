@@ -90,13 +90,6 @@ struct NearbyDevice {
         return "Unnamed \(kind.label)"
     }
 
-    var transportName: String {
-        switch source {
-        case .classic: return "Bluetooth Classic"
-        case .lowEnergy: return "Bluetooth Low Energy"
-        }
-    }
-
     var address: String? {
         if case .classic(let device) = source { return device.addressString }
         return nil
@@ -129,8 +122,9 @@ struct NearbyDevice {
         }
     }
 
+    /// Device type and signal strength, e.g. "Keyboard · Strong signal".
     var summary: String {
-        [detail, transportName, signalDescription].compactMap { $0 }.joined(separator: " · ")
+        [detail, signalDescription].compactMap { $0 }.joined(separator: " · ")
     }
 
     var category: DeviceCategory {

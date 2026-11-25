@@ -100,19 +100,22 @@ struct PairingPopupView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    if let address = device.address {
-                        Text(address)
-                            .font(.caption.monospaced())
-                            .foregroundStyle(.tertiary)
-                    }
                 }
                 Spacer(minLength: 0)
             }
 
             if let replacing = session.replacing, session.state != .succeeded {
-                Label(replacing, systemImage: "arrow.triangle.2.circlepath")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
+                Toggle(isOn: Binding(
+                    get: { session.replaceOld },
+                    set: { coordinator.setReplaceOld($0, for: session) }
+                )) {
+                    Text(replacing)
+                        .font(.callout)
+                        .lineLimit(1)
+                }
+                .toggleStyle(.checkbox)
+                .disabled(session.state.isBusy)
+                .help("PairMagic remembers this choice for this device.")
             }
 
             status
@@ -137,7 +140,7 @@ struct PairingPopupView: View {
                         .keyboardShortcut(.cancelAction)
                         .help("Hide until this device next goes into pairing mode")
                     Button("Ignore") { coordinator.ignore(session) }
-                        .help("Never ask about this device again. Undo from the menu bar under Ignored Devices.")
+                        .help("Never ask about this device again. Undo in PairMagic Settings › Devices.")
                 }
                 primaryButton
             }
@@ -159,7 +162,7 @@ struct PairingPopupView: View {
     @ViewBuilder private var primaryButton: some View {
         switch session.state {
         case .ready:
-            Button(session.replacing == nil ? "Pair" : "Replace & Pair") { coordinator.pair(session) }
+            Button("Pair") { coordinator.pair(session) }
                 .keyboardShortcut(.defaultAction)
                 .buttonStyle(.borderedProminent)
         case .failed:

@@ -3,7 +3,14 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         #if DEBUG
-        if CommandLine.arguments.contains("--dump-bluetooth-settings") { SettingsAutomator.dumpBluetoothPane() }
+        let args = CommandLine.arguments
+        if args.contains("--dump-bluetooth-settings") { SettingsAutomator.dumpBluetoothPane() }
+        if args.contains("--show-settings") { SettingsWindowController.shared.show() }
+        if args.contains("--mock-popups") { PairingCoordinator.shared.showAllMockPopups() }
+        if let i = args.firstIndex(of: "--mock-popup"), i + 1 < args.count,
+           let mock = MockPopup(rawValue: args[i + 1]) {
+            PairingCoordinator.shared.showMockPopup(mock)
+        }
         #endif
         _ = Updater.shared // starts Sparkle's scheduled update checks
         // Wait a moment so a first-run Bluetooth prompt has appeared and the
@@ -54,22 +61,6 @@ struct MenuContent: View {
             }
         }
 
-        if !coordinator.ignored.isEmpty {
-            Menu("Ignored Devices") {
-                Section("Click a device to stop ignoring it") {
-                    ForEach(coordinator.ignored) { device in
-                        Button {
-                            coordinator.unignore(device.id)
-                        } label: {
-                            Label(device.name, systemImage: device.kind.symbol)
-                        }
-                    }
-                }
-                Divider()
-                Button("Stop Ignoring All") { coordinator.clearIgnored() }
-            }
-        }
-
         if coordinator.isRemovingDuplicates {
             Text("Removing old pairings…")
         } else if coordinator.duplicateCount > 0 {
@@ -78,46 +69,40 @@ struct MenuContent: View {
             }
         }
 
+        if coordinator.needsAccessibility && !coordinator.accessibilityTrusted {
+            Button("Allow Accessibility Access…") { PermissionsWindowController.shared.show() }
+        }
+
         Divider()
 
         Toggle("Scan for Devices", isOn: $coordinator.isScanning)
-        Toggle("Pop Up When a Device Appears", isOn: $coordinator.autoPopup)
-        Toggle("Only Pop Up for Nearby Devices", isOn: $coordinator.nearbyOnly)
-            .disabled(!coordinator.autoPopup)
-        Toggle("Replace Paired Devices with the Same Name (Experimental)", isOn: Binding(
-            get: { coordinator.replaceSameName },
-            set: { coordinator.setReplaceSameName($0) }
-        ))
-        Toggle("Auto-Confirm macOS Pairing Prompt", isOn: $coordinator.autoConfirmPrompt)
-        if coordinator.needsAccessibility && !coordinator.accessibilityTrusted {
-            Button("    Allow Accessibility Access…") { PermissionsWindowController.shared.show() }
-        }
-        Toggle("Launch at Login", isOn: $coordinator.launchAtLogin)
-
-        Menu("Device Types") {
-            ForEach(DeviceCategory.choices) { category in
-                Toggle(isOn: Binding(
-                    get: { coordinator.isShowing(category) },
-                    set: { coordinator.setShowing(category, $0) }
-                )) {
-                    Label(category.label, systemImage: category.symbol)
-                }
-                .disabled(coordinator.showAllTypes)
-            }
-            Divider()
-            Toggle("Show All Device Types", isOn: $coordinator.showAllTypes)
-        }
 
         Divider()
 
-        Button("Permissions…") { PermissionsWindowController.shared.show() }
         Button("Bluetooth Settings…") { coordinator.openBluetoothSettings() }
 
         Divider()
 
+        Button("Settings…") { SettingsWindowController.shared.show() }
+            .keyboardShortcut(",")
         Button("Check for Updates…") { updater.checkForUpdates() }
             .disabled(!updater.canCheckForUpdates)
-        Toggle("Automatically Check for Updates", isOn: $updater.automaticallyChecks)
+
+        Divider()
+
+        #if DEBUG
+        Menu("Debug") {
+            Section("Mock Popups") {
+                ForEach(MockPopup.allCases) { mock in
+                    Button(mock.label) { coordinator.showMockPopup(mock) }
+                }
+                Button("Show All") { coordinator.showAllMockPopups() }
+            }
+        }
+
+        Divider()
+        #endif
+
         Button("About PairMagic") { AboutPanel.show() }
         Button("Quit PairMagic") { NSApp.terminate(nil) }
             .keyboardShortcut("q")

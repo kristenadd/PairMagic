@@ -28,6 +28,14 @@ final class PairingSession: ObservableObject, Identifiable {
     @Published var state: State = .ready
     /// Describes the already-paired device(s) that pairing this one will replace.
     @Published var replacing: String?
+    /// Whether to remove the pairings described by `replacing`. The popup's checkbox
+    /// sets it, and the choice is remembered for this device.
+    @Published var replaceOld = true
+    /// True once the user has changed the checkbox in this popup.
+    fileprivate var replaceChosen = false
+    /// A made-up device shown by the debug build's mock popups. Nothing it does touches Bluetooth
+    /// or saved settings.
+    var isMock = false
     /// Shown alongside the result, e.g. when an old pairing couldn't be removed.
     @Published var warning: String?
 
@@ -105,7 +113,7 @@ final class PairingCoordinator: ObservableObject {
     private enum Keys {
         static let scanning = "scanning", autoPopup = "autoPopup", showAll = "showAllTypes", replace = "replaceSameName"
         static let ignored = "ignoredDevices", autoConfirm = "autoConfirmPrompt", categories = "deviceCategories"
-        static let nearbyOnly = "nearbyOnly"
+        static let nearbyOnly = "nearbyOnly", replaceChoices = "replaceChoices"
     }
 
     /// How long a device can go unseen before it's considered out of pairing mode
@@ -244,7 +252,11 @@ final class PairingCoordinator: ObservableObject {
         devices[device.id] = device
         if let session = sessions[device.id] {
             session.device = device
-            if !session.state.isBusy { session.replacing = replacementSummary(for: device) }
+            if !session.state.isBusy {
+                session.replacing = replacementSummary(for: device)
+                // The name can arrive late, so look up a remembered choice again.
+                if !session.replaceChosen { session.replaceOld = wantsReplacement(for: device) }
+            }
         }
         // A Classic device's name can arrive after it was first seen.
         if let index = ignored.firstIndex(where: { $0.id == device.id }),
@@ -365,6 +377,7 @@ final class PairingCoordinator: ObservableObject {
         }
         let session = PairingSession(device: device)
         session.replacing = replacementSummary(for: device)
+        session.replaceOld = wantsReplacement(for: device)
         Self.log.notice("Offering \(device.displayName, privacy: .public) (advertised name \(device.name ?? "none", privacy: .public), RSSI \(device.rssi.map(String.init) ?? "unknown", privacy: .public)): \(session.replacing ?? "nothing to replace", privacy: .public)")
         sessions[device.id] = session
         popups.show(session, coordinator: self)
@@ -385,6 +398,7 @@ final class PairingCoordinator: ObservableObject {
 
     /// Closes the popup and never offers this device again until it's un-ignored.
     func ignore(_ session: PairingSession) {
+        if session.isMock { popups.close(session.id); return }
         if !isIgnored(session.id) {
             ignored.append(IgnoredDevice(id: session.id, name: session.device.displayName, kind: session.device.kind))
         }
@@ -405,9 +419,35 @@ final class PairingCoordinator: ObservableObject {
     }
 
     private func sessionClosed(_ id: String) {
-        if let session = sessions.removeValue(forKey: id), session.state.isBusy {
+        if let session = sessions.removeValue(forKey: id), session.state.isBusy, !session.isMock {
             cancel(session)
         }
+    }
+
+    // MARK: Per-device replacement choice
+
+    /// The popup's "Replace" checkbox, remembered by device ID and by name, since
+    /// some devices (e.g. Logitech mice) get a new address every time they re-pair.
+    private func replaceChoiceKeys(for device: NearbyDevice) -> [String] {
+        var keys = ["id:\(device.id)"]
+        if let name = device.name?.trimmingCharacters(in: .whitespaces), !name.isEmpty {
+            keys.append("name:\(name.lowercased())")
+        }
+        return keys
+    }
+
+    private func wantsReplacement(for device: NearbyDevice) -> Bool {
+        let saved = defaults.dictionary(forKey: Keys.replaceChoices) as? [String: Bool] ?? [:]
+        return replaceChoiceKeys(for: device).lazy.compactMap { saved[$0] }.first ?? true
+    }
+
+    func setReplaceOld(_ replace: Bool, for session: PairingSession) {
+        session.replaceOld = replace
+        session.replaceChosen = true
+        if session.isMock { return }
+        var saved = defaults.dictionary(forKey: Keys.replaceChoices) as? [String: Bool] ?? [:]
+        for key in replaceChoiceKeys(for: session.device) { saved[key] = replace }
+        defaults.set(saved, forKey: Keys.replaceChoices)
     }
 
     private func refreshReplacementInfo() {
@@ -436,18 +476,18 @@ final class PairingCoordinator: ObservableObject {
     }
 
     private func replacementSummary(for device: NearbyDevice) -> String? {
-        if let same = sameAddressEntry(for: device) {
-            return "Replaces “\(same.displayName)”, which is already paired"
-        }
+        // The popup already shows the device's name, so the checkbox label leaves it out.
+        if sameAddressEntry(for: device) != nil { return "Replace the existing pairing" }
         let others = sameNameEntries(for: device)
-        guard let first = others.first else { return nil }
-        return others.count == 1
-            ? "Replaces the existing “\(first.displayName)” pairing"
-            : "Replaces \(others.count) existing “\(first.displayName)” pairings"
+        guard !others.isEmpty else { return nil }
+        return others.count == 1 ? "Replace the existing pairing" : "Replace \(others.count) existing pairings"
     }
 
     func pair(_ session: PairingSession) {
         guard !session.state.isBusy else { return }
+        #if DEBUG
+        if session.isMock { simulatePairing(session); return }
+        #endif
         activePairings += 1
         applyScanning() // inquiry interferes with pairing, so pause while we work
 
@@ -455,10 +495,12 @@ final class PairingCoordinator: ObservableObject {
         session.warning = nil
         // Same-name pairings are removed only after the new one works, and only
         // those that existed beforehand, so the new pairing is never touched.
-        session.oldPairings = Set(sameNameEntries(for: device).map(\.key))
+        // With the popup's Replace box unchecked, existing pairings are left alone.
+        let replace = session.replaceOld
+        session.oldPairings = replace ? Set(sameNameEntries(for: device).map(\.key)) : []
         session.pairedBefore = Set(BluetoothSystem.pairedEntries().map(\.key))
 
-        if let same = sameAddressEntry(for: device) {
+        if replace, let same = sameAddressEntry(for: device) {
             session.state = .working("Removing old pairing for “\(same.displayName)”…")
             BluetoothSystem.unpair([same]) { [weak self, weak session] failed in
                 guard let self, let session else { return }
@@ -532,7 +574,7 @@ final class PairingCoordinator: ObservableObject {
     /// (if it re-paired under a new address) disconnects once it moves over, so
     /// wait a moment before looking.
     private func removeOldPairings(after session: PairingSession, completion: @escaping () -> Void) {
-        guard replaceSameName else { completion(); return }
+        guard replaceSameName, session.replaceOld else { completion(); return }
         session.state = .working("Paired. Checking for old pairings…")
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak session] in
             guard let session else { completion(); return }
@@ -643,3 +685,75 @@ final class PairingCoordinator: ObservableObject {
         }
     }
 }
+
+// MARK: - Mock popups (debug builds)
+
+#if DEBUG
+/// Popups for made-up devices, one per popup state, so the UI can be checked and screenshotted
+/// (e.g. for the README) without real devices. From the menu bar's Debug menu, or launch with
+/// `--mock-popups` (all of them) or `--mock-popup <name>`, e.g. `--mock-popup typeCode`.
+enum MockPopup: String, CaseIterable, Identifiable {
+    case ready, replace, typeCode, pairing, succeeded, failed
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .ready: return "Ready to Pair"
+        case .replace: return "Ready to Pair, Replacing an Old Pairing"
+        case .typeCode: return "Keyboard Passkey"
+        case .pairing: return "Pairing"
+        case .succeeded: return "Paired"
+        case .failed: return "Pairing Failed"
+        }
+    }
+
+    fileprivate var device: (name: String, kind: DeviceKind, detail: String, address: String, rssi: Int) {
+        switch self {
+        case .ready: return ("Ergo Wireless Mouse", .mouse, "Pointing device", "4C-87-5D-10-2A-61", -48)
+        case .replace: return ("Wireless Controller", .gamepad, "Game controller", "98-B6-E9-3C-11-07", -45)
+        case .typeCode: return ("Travel Keyboard", .keyboard, "Keyboard", "E8-06-88-71-5B-C2", -52)
+        case .pairing: return ("Compact Trackball", .mouse, "Pointing device", "60-A4-4C-2F-90-1D", -55)
+        case .succeeded: return ("Studio Headphones", .headset, "Headphones", "AC-80-0A-6E-33-F4", -50)
+        case .failed: return ("Desk Speaker", .speaker, "Speaker", "00-1B-66-C5-7A-28", -58)
+        }
+    }
+}
+
+extension PairingCoordinator {
+    func showMockPopup(_ mock: MockPopup) {
+        let info = mock.device
+        guard let fake = IOBluetoothDevice(addressString: info.address) else { return }
+        let id = "mock-\(mock.rawValue)"
+        if sessions[id] != nil { popups.close(id) }
+        let device = NearbyDevice(id: id, source: .classic(fake), name: info.name, kind: info.kind,
+                                  detail: info.detail, isInputDevice: info.kind != .headset && info.kind != .speaker,
+                                  rssi: info.rssi, lastSeen: Date())
+        let session = PairingSession(device: device)
+        session.isMock = true
+        switch mock {
+        case .ready: break
+        case .replace: session.replacing = "Replace the existing pairing"
+        case .typeCode: session.state = .typeCode("482915")
+        case .pairing: session.state = .working("Pairing…")
+        case .succeeded: session.state = .succeeded
+        case .failed: session.state = .failed("The device didn't respond. Put it back in pairing mode and try again.")
+        }
+        sessions[id] = session
+        popups.show(session, coordinator: self)
+    }
+
+    func showAllMockPopups() {
+        MockPopup.allCases.forEach(showMockPopup)
+    }
+
+    /// Clicking Pair on a mock steps through the popup's states instead of pairing anything.
+    fileprivate func simulatePairing(_ session: PairingSession) {
+        session.state = .working("Pairing…")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self, weak session] in
+            guard let self, let session, self.sessions[session.id] === session else { return }
+            session.state = .succeeded
+        }
+    }
+}
+#endif
