@@ -34,7 +34,7 @@ final class PairingSession: ObservableObject, Identifiable {
     /// True once the user has changed the checkbox in this popup.
     fileprivate var replaceChosen = false
     /// A made-up device shown by the debug build's mock popups. Nothing it does touches Bluetooth
-    /// or saved settings.
+    /// (its Replace choice is remembered like a real device's, so that can be tested).
     var isMock = false
     /// Shown alongside the result, e.g. when an old pairing couldn't be removed.
     @Published var warning: String?
@@ -444,7 +444,6 @@ final class PairingCoordinator: ObservableObject {
     func setReplaceOld(_ replace: Bool, for session: PairingSession) {
         session.replaceOld = replace
         session.replaceChosen = true
-        if session.isMock { return }
         var saved = defaults.dictionary(forKey: Keys.replaceChoices) as? [String: Bool] ?? [:]
         for key in replaceChoiceKeys(for: session.device) { saved[key] = replace }
         defaults.set(saved, forKey: Keys.replaceChoices)
@@ -731,6 +730,7 @@ extension PairingCoordinator {
                                   rssi: info.rssi, lastSeen: Date())
         let session = PairingSession(device: device)
         session.isMock = true
+        session.replaceOld = wantsReplacement(for: device)
         switch mock {
         case .ready: break
         case .replace: session.replacing = "Replace the existing pairing"

@@ -11,7 +11,7 @@ Bluetooth devices in pairing mode and pops up a one-click **Pair** prompt.
 <p align="center">
   <img src="docs/screenshots/popup-game-controller.png" width="360" alt="Pairing popup for a game controller, with a checked Replace the existing pairing box">
   &nbsp;
-  <img src="docs/screenshots/popup-mouse.png" width="360" alt="Pairing popup for a Bluetooth mouse">
+  <img src="docs/screenshots/popup-mouse.png" width="360" alt="Pairing popup for a Bluetooth mouse, with the Replace box unchecked">
 </p>
 
 - Detects keyboards, mice, game controllers, headsets and speakers, and shows a matching icon.
@@ -24,8 +24,8 @@ Bluetooth devices in pairing mode and pops up a one-click **Pair** prompt.
 - **Replaces old pairings**: if the same device (same address) is already paired, the stale pairing
   is removed first. With *Replace paired devices with the same name* (Experimental, off by default) on in Settings, a paired device
   with the same name, such as your old controller of the same model, is removed too.
-  The popup shows what will be replaced as a checkbox; uncheck it to keep the old pairing. PairMagic
-  remembers that choice for the device (by address and by name).
+  The popup has a Replace checkbox (it says what will be replaced, when there's something); uncheck
+  it to keep old pairings. PairMagic remembers that choice for the device (by address and by name).
 - Handles keyboard passkeys: if a keyboard needs a code, the popup shows it big enough to type.
 - Has a standard Settings window (**Settings…**, ⌘, in the menu) with General, Devices, Pairing and
   Updates tabs. The menu itself stays short: nearby devices, *Scan for Devices*, and app commands.

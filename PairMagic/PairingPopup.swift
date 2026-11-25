@@ -104,12 +104,14 @@ struct PairingPopupView: View {
                 Spacer(minLength: 0)
             }
 
-            if let replacing = session.replacing, session.state != .succeeded {
+            // Always shown, so the remembered choice is visible even when there's
+            // nothing to replace right now.
+            if session.state != .succeeded {
                 Toggle(isOn: Binding(
                     get: { session.replaceOld },
                     set: { coordinator.setReplaceOld($0, for: session) }
                 )) {
-                    Text(replacing)
+                    Text(session.replacing ?? "Replace any existing pairing")
                         .font(.callout)
                         .lineLimit(1)
                 }
