@@ -8,19 +8,52 @@ Apple's Magic accessories pair the moment you plug them in. PairMagic gives othe
 accessories that same ease. It's a native macOS menu bar app (Swift, SwiftUI + AppKit, IOBluetooth/CoreBluetooth) that watches for
 Bluetooth devices in pairing mode and pops up a one-click **Pair** prompt.
 
+<p align="center">
+  <img src="docs/screenshots/popup-game-controller.png" width="360" alt="Pairing popup for a game controller, with a checked Replace the existing pairing box">
+  &nbsp;
+  <img src="docs/screenshots/popup-mouse.png" width="360" alt="Pairing popup for a Bluetooth mouse">
+</p>
+
 - Detects keyboards, mice, game controllers, headsets and speakers, and shows a matching icon.
-- Shows a description built from the device's Bluetooth class, transport and signal strength.
+- Shows a description built from the device's Bluetooth class and signal strength.
 - Only pops up for devices right next to the Mac (a strong signal, −60 dBm or better), so a
   neighbour's headphones don't interrupt you. Farther devices are still listed in the menu, and
-  *Only Pop Up for Nearby Devices* turns this off.
+  *Only pop up for devices right next to this Mac* in Settings turns this off.
 - Doesn't pop up for devices that don't send a name (they show as "Unnamed …" in the menu, where
   you can still pick them).
 - **Replaces old pairings**: if the same device (same address) is already paired, the stale pairing
-  is removed first. With *Replace Paired Devices with the Same Name (Experimental)* on (off by default), a paired device
+  is removed first. With *Replace paired devices with the same name* (Experimental, off by default) on in Settings, a paired device
   with the same name, such as your old controller of the same model, is removed too.
+  The popup shows what will be replaced as a checkbox; uncheck it to keep the old pairing. PairMagic
+  remembers that choice for the device (by address and by name).
 - Handles keyboard passkeys: if a keyboard needs a code, the popup shows it big enough to type.
+- Has a standard Settings window (**Settings…**, ⌘, in the menu) with General, Devices, Pairing and
+  Updates tabs. The menu itself stays short: nearby devices, *Scan for Devices*, and app commands.
 - Updates itself: it checks for new releases daily with [Sparkle](https://sparkle-project.org) and
   offers to install them. You can also choose **Check for Updates…** from the menu.
+
+## Settings
+
+Choose **Settings…** (⌘,) from the menu bar icon.
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/settings-general.png" width="400" alt="General settings: launch at login, scanning and popup options"></td>
+    <td><img src="docs/screenshots/settings-devices.png" width="400" alt="Devices settings: device types to offer and ignored devices"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>General</b>: launch at login, scanning and when to pop up</td>
+    <td align="center"><b>Devices</b>: which device types to offer, and ignored devices</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/settings-pairing.png" width="400" alt="Pairing settings: auto-confirm, replacing old pairings and permissions"></td>
+    <td><img src="docs/screenshots/settings-updates.png" width="400" alt="Updates settings: version and automatic update checks"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Pairing</b>: auto-confirm, replacing old pairings, permissions</td>
+    <td align="center"><b>Updates</b>: automatic checks and Check for Updates…</td>
+  </tr>
+</table>
 
 ## Build & run
 
@@ -32,6 +65,18 @@ open build/DerivedData/Build/Products/Release/PairMagic.app
 ```
 
 On first launch macOS asks for Bluetooth permission. Allow it.
+
+Debug builds have a **Debug › Mock Popups** menu that shows a pairing popup for a made-up device in
+each state (ready, replacing an old pairing, keyboard passkey, pairing, paired, failed). Clicking
+Pair on one only plays through the states, so you can take screenshots without real devices. You can
+also open them at launch:
+
+```bash
+open "build/DerivedData/Build/Products/Debug/PairMagic Debug.app" --args --mock-popups
+```
+
+Use `--mock-popup <name>` for just one (`ready`, `replace`, `typeCode`, `pairing`, `succeeded` or
+`failed`), and `--show-settings` to open the Settings window.
 
 The project signs with an Apple Development certificate (set under Signing & Capabilities). A real
 signing identity matters here: macOS ties the Accessibility permission to the app's signature, and
@@ -129,20 +174,20 @@ is in `PairMagic/Assets.xcassets/AppIcon.appiconset`.
 - **Bluetooth LE** (many newer mice and keyboards): devices that advertise the HID service are offered.
   CoreBluetooth has no public "pair" API, so the app connects and touches the device's protected
   characteristics, which makes macOS pair it. macOS may show its own "Connection Request" alert.
-  This route is best-effort. If it times out, use the **Bluetooth Settings…** button.
-- **Auto-confirming the macOS prompt**: with *Auto-Confirm macOS Pairing Prompt* on (the default),
+  This route is best-effort. If it times out, use **Bluetooth Settings…** in the menu.
+- **Auto-confirming the macOS prompt**: with *Automatically confirm the macOS pairing prompt* on (Settings › Pairing) (the default),
   the app uses the Accessibility API to press **Connect** on the system's LE pairing alert. It only
   does this for 30 seconds after you click Pair, and only on an alert that names that device. Any
   other pairing request still needs your approval. The app needs Accessibility permission (System
-  Settings › Privacy & Security › Accessibility). The setup window, under *Permissions…* in the menu,
+  Settings › Privacy & Security › Accessibility). The setup window, under *Review Permissions…* in Settings › Pairing,
   walks you through it. If the alert isn't recognized, it's
   left for you to click. To see what the app found, run
   `/usr/bin/log stream --predicate 'subsystem == "com.kristenadd.PairMagic"'`.
-- **Replacing old pairings**: with *Replace Paired Devices with the Same Name (Experimental)* on (off by default, and turning it on explains how it works), the app removes
+- **Replacing old pairings**: with *Replace paired devices with the same name* (Experimental, in Settings › Pairing) on (off by default, and turning it on explains how it works), the app removes
   older pairings with the same name once the new pairing works, but only disconnected ones that existed
   before you clicked Pair. Some devices, such as Logitech mice, get a new address on every re-pair. A
   shortened advertised name like "Logi M550" matches the stored "Logi M550 L". *Remove Disconnected
-  Duplicates* in the menu does the same cleanup on demand.
+  Duplicates* in the menu or Settings › Pairing does the same cleanup on demand.
 - **How pairings are removed**: Apple has no public unpair API. Recent macOS silently ignores the private
   ones (`-[IOBluetoothDevice remove]`, `-[CBPairingAgent unpairPeer:]`) from apps that aren't Apple's.
   The app still tries `remove` first, but then has System Settings do it: through the Accessibility API, it
